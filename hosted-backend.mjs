@@ -140,8 +140,8 @@ async function startJob(payload) {
       const importerArgs = [
         "--url", url,
         "--output", path.join(directory, "ImportedVideo"),
-        "--start", "0", "--width", "384", "--height", "216", "--fps", "15",
-        "--max-total-mib", "120", "--temporal-threshold", "1",
+        "--start", "0", "--width", "384", "--height", "216", "--fps", "30",
+        "--max-total-mib", "180", "--temporal-threshold", "1",
         "--sine-asset-id", sineAssetId, "--noise-asset-id", noiseAssetId,
       ];
       if (Number.isFinite(testDuration) && testDuration > 0) importerArgs.push("--duration", String(testDuration));
