@@ -15,6 +15,8 @@ const workRoot = path.resolve(process.env.RBV1_JOB_DIR || path.join(os.tmpdir(),
 const ttlMs = Math.max(5 * 60_000, Number(process.env.RBV1_JOB_TTL_MS || 60 * 60_000));
 const testDuration = Number(process.env.RBV1_TEST_DURATION_SECONDS || 0);
 const jobs = new Map();
+const QUALITY_PROFILES = new Set(["256x144", "320x180", "384x216"]);
+const FRAME_RATES = new Set([15, 24, 30]);
 
 fs.mkdirSync(workRoot, { recursive: true });
 
@@ -128,10 +130,17 @@ async function startJob(payload) {
   const sineAssetId = String(payload.sineAssetId || "").replace(/\D/g, "");
   const noiseAssetId = String(payload.noiseAssetId || "").replace(/\D/g, "");
   if (!/^[1-9]\d*$/.test(sineAssetId) || !/^[1-9]\d*$/.test(noiseAssetId)) throw new Error("Valid oscillator asset IDs are required");
+  const width = Number(payload.width ?? 384);
+  const height = Number(payload.height ?? 216);
+  const fps = Number(payload.fps ?? 30);
+  if (!QUALITY_PROFILES.has(`${width}x${height}`)) throw new Error("Quality must be 144p, 180p, or 216p");
+  if (!FRAME_RATES.has(fps)) throw new Error("Frame rate must be 15, 24, or 30 FPS");
+  const profileScale = (width * height) / (384 * 216) * (fps / 30);
+  const maxTotalMib = Math.max(80, Math.ceil(180 * profileScale));
   const id = randomUUID();
   const directory = path.join(workRoot, id);
   fs.mkdirSync(directory, { recursive: true });
-  const job = { id, clipId: id, directory, phase: "queued", message: "Queued", output: "", createdAt: Date.now(), updatedAt: Date.now() };
+  const job = { id, clipId: id, directory, width, height, fps, phase: "queued", message: "Queued", output: "", createdAt: Date.now(), updatedAt: Date.now() };
   jobs.set(id, job);
   void (async () => {
     try {
@@ -140,8 +149,8 @@ async function startJob(payload) {
       const importerArgs = [
         "--url", url,
         "--output", path.join(directory, "ImportedVideo"),
-        "--start", "0", "--width", "384", "--height", "216", "--fps", "30",
-        "--max-total-mib", "180", "--temporal-threshold", "1",
+        "--start", "0", "--width", String(width), "--height", String(height), "--fps", String(fps),
+        "--max-total-mib", String(maxTotalMib), "--temporal-threshold", "1",
         "--sine-asset-id", sineAssetId, "--noise-asset-id", noiseAssetId,
       ];
       if (Number.isFinite(testDuration) && testDuration > 0) importerArgs.push("--duration", String(testDuration));
@@ -165,7 +174,7 @@ async function startJob(payload) {
 }
 
 function publicJob(job) {
-  return { jobId: job.id, phase: job.phase, message: job.message, clipId: job.phase === "complete" ? job.clipId : undefined };
+  return { jobId: job.id, phase: job.phase, message: job.message, width: job.width, height: job.height, fps: job.fps, clipId: job.phase === "complete" ? job.clipId : undefined };
 }
 
 setInterval(() => {
