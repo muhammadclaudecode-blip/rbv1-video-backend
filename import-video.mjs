@@ -137,13 +137,14 @@ try {
     let transcodeStart = options.start;
     if (options.url) {
       const template = path.join(tempDir, "source.%(ext)s");
-      const makeAcquisitionArgs = (ffmpegPath) => {
+      const clientProfiles = ["tv_simply", "android_vr", "visionos", "web_safari", "mweb"];
+      const makeAcquisitionArgs = (ffmpegPath, playerClient) => {
         const args = [
           "--ignore-config", "--no-playlist", "--no-cache-dir", "--no-cookies",
           "--no-write-comments", "--no-write-thumbnail", "--no-write-subs", "--no-color", "--newline",
           "--force-ipv4", "--socket-timeout", "10", "--retries", "3", "--fragment-retries", "3", "--extractor-retries", "3",
           "--extractor-args", "youtubetab:skip=webpage",
-          "--extractor-args", "youtube:player_skip=webpage,configs;player_client=tv,web_safari",
+          "--extractor-args", `youtube:player_skip=webpage,configs;player_client=${playerClient}`,
           "--extractor-args", "youtubepot-bgutilscript:server_home=/root/bgutil-ytdlp-pot-provider/server",
           "--concurrent-fragments", "4",
           "--progress-template", "download:[download] %(progress._percent_str)s of %(progress._total_bytes_str)s at %(progress._speed_str)s ETA %(progress._eta_str)s",
@@ -159,29 +160,29 @@ try {
       const clearAcquisitionFiles = () => {
         for (const name of fs.readdirSync(tempDir)) fs.rmSync(path.join(tempDir, name), { recursive: true, force: true });
       };
-      const acquireWithFreshUrls = (ffmpegPath, label, attempts) => {
+      const acquireWithFreshUrls = (ffmpegPath, label, profiles) => {
         let lastError;
-        for (let attempt = 1; attempt <= attempts; attempt++) {
+        for (let attempt = 1; attempt <= profiles.length; attempt++) {
           try {
-            run(ytdlp, makeAcquisitionArgs(ffmpegPath), label);
+            run(ytdlp, makeAcquisitionArgs(ffmpegPath, profiles[attempt - 1]), label);
             return;
           } catch (error) {
             lastError = error;
-            if (attempt < attempts) {
+            if (attempt < profiles.length) {
               clearAcquisitionFiles();
-              console.warn(`${label} failed; extracting fresh YouTube CDN URLs (attempt ${attempt + 1}/${attempts}).`);
+              console.warn(`${label} failed with ${profiles[attempt - 1]}; trying ${profiles[attempt]} (attempt ${attempt + 1}/${profiles.length}).`);
             }
           }
         }
         throw lastError;
       };
       try {
-        acquireWithFreshUrls(ffmpeg, "yt-dlp", 3);
+        acquireWithFreshUrls(ffmpeg, "yt-dlp", clientProfiles);
       } catch (primaryError) {
-        if (fallbackAcquisitionFfmpeg === ffmpeg) throw primaryError;
+        if (!fallbackAcquisitionFfmpeg || fallbackAcquisitionFfmpeg === ffmpeg) throw primaryError;
         clearAcquisitionFiles();
         console.warn("Primary FFmpeg acquisition failed; retrying with yt-dlp's bundled FFmpeg build.");
-        acquireWithFreshUrls(fallbackAcquisitionFfmpeg, "yt-dlp fallback", 2);
+        acquireWithFreshUrls(fallbackAcquisitionFfmpeg, "yt-dlp fallback", clientProfiles);
       }
       inputPath = fs.readdirSync(tempDir).map((name) => path.join(tempDir, name)).find((file) => path.basename(file).startsWith("source."));
       if (!inputPath) throw new Error("yt-dlp did not produce a video file");
