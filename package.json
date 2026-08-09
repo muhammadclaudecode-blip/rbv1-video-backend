@@ -1,0 +1,11 @@
+{
+  "name": "roblox-rbv1-video-importer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test-codec.mjs && node test-audio-codec.mjs",
+    "generate-assets": "node generate-oscillators.mjs assets",
+    "host": "node hosted-backend.mjs"
+  }
+}
