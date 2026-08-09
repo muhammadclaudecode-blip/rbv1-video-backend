@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: rbv1-video-backend
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: RBV1_API_KEY
+        sync: false
+      - key: RBV1_JOB_TTL_MS
+        value: "3600000"
