@@ -152,6 +152,7 @@ try {
           "--max-filesize", "250M",
           "-f", "bestvideo[height<=360][vcodec^=avc1]+bestaudio/bestvideo[height<=360]+bestaudio/best[height<=360]", "--merge-output-format", "mp4", "-o", template, options.url,
         ];
+        if (process.env.RBV1_YTDLP_PROXY) args.unshift("--proxy", process.env.RBV1_YTDLP_PROXY);
         if (options.duration !== "full") args.splice(args.indexOf("-f"), 0, "--download-sections", `*${options.start}-${options.start + options.duration}`);
         if (deno) args.unshift("--js-runtimes", `deno:${deno}`);
         else args.unshift("--js-runtimes", "node");
