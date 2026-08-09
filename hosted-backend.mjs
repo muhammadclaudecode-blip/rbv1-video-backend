@@ -151,7 +151,11 @@ async function startJob(payload) {
     } catch (error) {
       job.phase = "error";
       const useful = job.output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-4).join(" ");
-      job.message = `${error.message}${useful ? `: ${useful}` : ""}`;
+      if (/Sign in to confirm you.re not a bot|This video is unavailable\. Error code: 152/i.test(job.output)) {
+        job.message = "YouTube blocked this cloud server for that video. Try again later or use another public video; account cookies and untrusted proxy services are intentionally disabled.";
+      } else {
+        job.message = `${error.message}${useful ? `: ${useful}` : ""}`;
+      }
     } finally {
       job.updatedAt = Date.now();
       delete job.pid;
