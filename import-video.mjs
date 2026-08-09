@@ -7,7 +7,7 @@ import { encodeRgb24File, writePackage } from "./rbv1.mjs";
 import { analyzePcm16, encodeAudioFrames, writeAudioPackage } from "./audio-analysis.mjs";
 
 function parseArgs(argv) {
-  const options = { start: 0, duration: "full", width: 256, height: 144, fps: 15, maxTotalMib: 20 };
+  const options = { start: 0, duration: "full", width: 256, height: 144, fps: 15, maxTotalMib: 20, temporalThreshold: 0 };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith("--")) throw new Error(`Unexpected argument: ${arg}`);
@@ -15,13 +15,13 @@ function parseArgs(argv) {
     if (key === "help") options.help = true;
     else options[key] = argv[++i];
   }
-  for (const key of ["start", "width", "height", "fps", "maxTotalMib"]) options[key] = Number(options[key]);
+  for (const key of ["start", "width", "height", "fps", "maxTotalMib", "temporalThreshold"]) options[key] = Number(options[key]);
   if (options.duration !== "full") options.duration = Number(options.duration);
   return options;
 }
 
 function usage() {
-  console.log("import-video --url <youtube-url> --output <directory> [--sine-asset-id <id> --noise-asset-id <id>] [--start 0 --duration full --width 256 --height 144 --fps 15 --max-total-mib 20]");
+  console.log("import-video --url <youtube-url> --output <directory> [--sine-asset-id <id> --noise-asset-id <id>] [--start 0 --duration full --width 256 --height 144 --fps 15 --max-total-mib 20 --temporal-threshold 0]");
   console.log("             --input <local-video> may be used instead of --url");
 }
 
@@ -55,6 +55,7 @@ function validate(options) {
   if (![options.width, options.height, options.fps].every(Number.isInteger)) throw new Error("Width, height, and FPS must be integers");
   if (options.width < 16 || options.height < 16 || options.width > 512 || options.height > 512 || options.fps < 1 || options.fps > 30) throw new Error("Dimensions must be 16..512 and FPS 1..30");
   if (!Number.isFinite(options.maxTotalMib) || options.maxTotalMib < 1 || options.maxTotalMib > 256) throw new Error("--max-total-mib must be between 1 and 256");
+  if (!Number.isInteger(options.temporalThreshold) || options.temporalThreshold < 0 || options.temporalThreshold > 4) throw new Error("--temporal-threshold must be an integer from 0 to 4");
 }
 
 function findFile(root, wanted, depth = 0) {

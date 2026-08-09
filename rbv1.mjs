@@ -165,7 +165,7 @@ function makeRecord(frameIndex, type, payload) {
 }
 
 function encodeFrameSequence(frameCount, getFrame, options) {
-  const { width, height, fps, keyframeInterval = fps * 2 } = options;
+  const { width, height, fps, keyframeInterval = fps * 2, temporalThreshold = 0 } = options;
   const maxTotalBytes = options.maxTotalBytes ?? MAX_TOTAL_BYTES;
   if (!frameCount) throw new Error("No frames to encode");
   const chunks = [];
@@ -181,10 +181,24 @@ function encodeFrameSequence(frameCount, getFrame, options) {
   };
 
   for (let i = 0; i < frameCount; i++) {
-    const indexed = getFrame(i);
+    let indexed = getFrame(i);
     const isKeyframe = i % keyframeInterval === 0;
-    const payload = isKeyframe ? packBitsEncode(indexed) : deltaEncode(previous, indexed);
-    const type = isKeyframe ? 0 : 1;
+    if (!isKeyframe && previous && temporalThreshold > 0) {
+      indexed = Buffer.from(indexed);
+      for (let pixel = 0; pixel < indexed.length; pixel++) {
+        const before = previous[pixel];
+        const after = indexed[pixel];
+        const distance = Math.abs((before >>> 5) - (after >>> 5))
+          + Math.abs(((before >>> 2) & 7) - ((after >>> 2) & 7))
+          + Math.abs((before & 3) - (after & 3));
+        if (distance <= temporalThreshold) indexed[pixel] = before;
+      }
+    }
+    const fullPayload = packBitsEncode(indexed);
+    const deltaPayload = isKeyframe ? null : deltaEncode(previous, indexed);
+    const useFullFrame = isKeyframe || fullPayload.length < deltaPayload.length;
+    const payload = useFullFrame ? fullPayload : deltaPayload;
+    const type = useFullFrame ? 0 : 1;
     const record = makeRecord(i, type, payload);
     if (record.length > MAX_CHUNK_BYTES) throw new Error(`Frame ${i} exceeds the chunk limit`);
     if (currentSize + record.length > MAX_CHUNK_BYTES) flush();
